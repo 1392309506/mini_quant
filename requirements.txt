@@ -1,0 +1,36 @@
+# Quant Trading System 依赖
+# 安装方式: pip install -r requirements.txt
+
+# === 核心 ===
+pandas>=2.0.0
+numpy>=1.24.0
+
+# === 数据获取 ===
+yfinance>=0.2.0
+requests>=2.28.0
+python-dotenv>=1.0.0       # 读取 .env 文件
+
+# === 机器学习 ===
+scikit-learn>=1.2.0        # 数据预处理、Metrics
+lightgbm>=4.0.0            # GBDT 信号融合（模型训练）
+xgboost>=1.7.0             # 备选模型
+
+# === 回测 ===
+vectorbt>=0.30.0           # 向量化回测（推荐）
+# backtrader>=2.0.0        # 如果需要更精细的回测（备选）
+
+# === 交易执行 ===
+MetaTrader5>=5.0.0         # MT5 自动化下单（连接 Exness/IC Markets）
+                           # 安装: pip install MetaTrader5
+
+# === 可视化（可选）===
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# === 数据存储 ===
+pyarrow>=12.0.0            # parquet 读写（pandas 底层使用）
+fastparquet>=2023.0.0      # parquet 备选引擎
+
+# === 通知（可选）===
+# requests 已包含，Telegram Bot SDK 可选
+# python-telegram-bot>=20.0
