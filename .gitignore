@@ -70,3 +70,6 @@ logs/
 .mypy_cache/
 .ruff_cache/
 .pyre/
+
+# === 调研笔记 ===
+notes/
