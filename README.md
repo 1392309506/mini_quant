@@ -23,24 +23,25 @@
 git clone <your-repo-url> Quant
 cd Quant
 
-# 2. 虚拟环境
-python -m venv .venv
-.venv\Scripts\activate          # Windows
+# 2. 创建 conda 环境
+conda create -n quant python=3.12 -y
+conda activate quant
 
-# 3. 安装依赖（清华镜像加速）
+# 3. 安装依赖
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # 4. 配置环境变量
-cp .env.example .env            # 然后编辑 .env 填入代理端口和 API Key
+cp .env.example .env
+# 编辑 .env 填入代理端口和 API Key
 
 # 5. 下载数据（先小样本测试）
 python data_fetcher.py --max 3
 
 # 6. 计算因子
-python factor_engine.py --cache
+python factor_engine.py
 ```
 
-详细操作流程见 [docs/操作流程.md](docs/操作流程.md)。
+详细使用说明（预期输出、参数说明、FAQ、Jupyter 用法）见 [docs/使用指南.md](docs/使用指南.md)。
 
 ---
 
@@ -52,15 +53,12 @@ Quant/
 │   ├── fetcher.py           # 数据获取（yfinance + AV 双后端）
 │   ├── engine.py            # 因子计算引擎
 │   └── factor.py            # 因子模块公开接口
-├── data/                    # 数据缓存（.gitignore 忽略内容）
-├── test/                    # 临时测试脚本
-├── docs/
-│   ├── 操作流程.md           # 使用文档
-│   └── 工程化改造.md         # 架构演进与版本管理规范
+├── data/                    # 数据缓存（.gitignore 忽略）
+├── docs/                    # 文档
 ├── data_fetcher.py          # 数据获取入口
 ├── factor_engine.py         # 因子计算入口
 ├── requirements.txt
-├── .env.example             # 配置模板（.env 不入库）
+├── .env.example             # 配置模板
 └── .gitignore
 ```
 
@@ -72,9 +70,6 @@ Quant/
 .env (代理/Key)  ──►  fetcher  ──►  data/market_data.parquet  ──►  engine  ──►  factor panel
                        (yfinance/AV)   (MultiIndex: ticker×OHLCV)        (ticker×factor)
 ```
-
-- 输入：OHLCV 日线（MultiIndex 列：`ticker × {Open,High,Low,Close,Volume}`）
-- 输出：因子面板（MultiIndex 列：`ticker × factor_name`）
 
 ---
 
@@ -102,10 +97,6 @@ Quant/
 - [ ] 实盘执行（MetaTrader5 对接 Exness）
 
 ---
-
-## 版本管理
-
-本项目遵循 Conventional Commits + Git Flow，详见 [docs/工程化改造.md §版本管理](docs/工程化改造.md#版本管理)。
 
 ## License
 
