@@ -1,11 +1,12 @@
 """
 config.py — 集中配置模块
 
-所有可变参数（标的池、阈值、路径）的唯一来源。
 读取顺序：环境变量 > .env 文件 > 代码默认值。
 
 用法:
-    from quant.config import TRADE_UNIVERSE, DATA_DIR, get_backend
+    from quant.config import DATA_DIR, get_backend, get_proxies
+
+交易标的池已移入 quant/universe.py（经常调整），不在此处定义。
 """
 
 from pathlib import Path
@@ -29,16 +30,6 @@ load_dotenv(PROJECT_ROOT / ".env")
 # ---------------------------------------------------------------------------
 # 业务参数
 # ---------------------------------------------------------------------------
-
-# 交易标的池
-TRADE_UNIVERSE = [
-    "AAPL", "MSFT", "GOOGL", "AMZN", "META",
-    "NVDA", "TSLA", "JPM", "V",
-    "JNJ", "WMT", "PG", "MA", "UNH",
-    "HD", "DIS", "NFLX", "ADBE", "CRM",
-    "BAC", "KO", "COST", "PEP", "CVX",
-    "GLD", "QQQ",
-]
 
 # 缓存过期天数
 STALE_DAYS = 7

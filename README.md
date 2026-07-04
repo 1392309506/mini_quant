@@ -50,7 +50,16 @@ python factor_engine.py
 ```
 Quant/
 ├── quant/                   # 核心库（包）
-│   ├── fetcher.py           # 数据获取（yfinance + AV 双后端）
+│   ├── config.py            # 集中配置（缓存、代理、批大小等稳定参数）
+│   ├── universe.py          # 交易标的池加载器（读取 universe.txt）
+│   ├── universe.txt          # 交易标的池（一行一个 ticker，# 注释分割板块）
+│   ├── io/                  # 数据后端层（DataBackend 协议）
+│   │   ├── base.py          #   DataBackend 抽象协议
+│   │   ├── cache.py         #   parquet 缓存管理
+│   │   ├── yfinance_backend.py  # yfinance 实现（默认）
+│   │   ├── alpha_vantage.py     # Alpha Vantage 兜底
+│   │   └── mt5_backend.py       # MT5 实盘报价（预留）
+│   ├── fetcher.py           # 数据获取编排层（注册表分发）
 │   ├── engine.py            # 因子计算引擎
 │   └── factor.py            # 因子模块公开接口
 ├── data/                    # 数据缓存（.gitignore 忽略）
@@ -67,8 +76,8 @@ Quant/
 ## 数据流
 
 ```
-.env (代理/Key)  ──►  fetcher  ──►  data/market_data.parquet  ──►  engine  ──►  factor panel
-                       (yfinance/AV)   (MultiIndex: ticker×OHLCV)        (ticker×factor)
+.env (代理/Key)  ──►  config.py  ──►  io/  ──►  data/market_data.parquet  ──►  engine  ──►  factor panel
+                       (配置中心)        (DataBackend 注册表)   (MultiIndex: ticker×OHLCV)        (ticker×factor)
 ```
 
 ---

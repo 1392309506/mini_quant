@@ -1,221 +1,30 @@
 """
-Fetcher — 数据下载与管理模块
+Fetcher — 数据下载与管理模块（高层编排层）
 
-支持两个数据后端，通过 .env 的 DATA_BACKEND 配置：
-  - yfinance (默认): 数据完整、历史长，但在中国需代理（v2rayN/clash）
-  - alpha_vantage:   免费层仅 100 天 compact 数据，无需代理，作为兜底
-
-输出：MultiIndex DataFrame (列: ticker × OHLCV)，缓存到 data/market_data.parquet
+通过 io/ 子包中的 DataBackend 注册表分发到具体后端。
+yfinance / Alpha Vantage 的具体实现已移至 quant/io/。
 """
 
 import json
-import time
 import logging
-from datetime import datetime
 from typing import Optional, List, Dict
 
 import pandas as pd
 import numpy as np
-import requests
 
 from quant.config import (
     DATA_DIR,
     CACHE_FILE,
-    TRADE_UNIVERSE,
     STALE_DAYS,
-    YF_BATCH_SIZE,
-    YF_PAUSE,
-    AV_CALL_INTERVAL,
-    get_backend,
-    get_proxies,
-    get_av_key,
+    get_backend as get_config_backend,
 )
+from quant.universe import TRADE_UNIVERSE
+from quant.io import get_backend as resolve_backend
+from quant.io.cache import CacheManager
 
 logger = logging.getLogger(__name__)
 
 DATA_DIR.mkdir(exist_ok=True)
-
-
-# ---------------------------------------------------------------------------
-# yfinance 后端（默认，需代理）
-# ---------------------------------------------------------------------------
-
-def _make_yf_session() -> requests.Session:
-    """构造带代理的 requests session 供 yfinance 使用"""
-    session = requests.Session()
-    session.headers.update({
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                      "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
-    })
-    proxies = get_proxies()
-    if proxies:
-        session.proxies.update(proxies)
-        logger.info(f"🌐 yfinance 使用代理: {proxies['https']}")
-    else:
-        logger.warning("⚠️  未配置代理，yfinance 在中国大概率被限流。"
-                       "请在 .env 中设置 HTTP_PROXY/HTTPS_PROXY（如 http://127.0.0.1:10808）")
-    return session
-
-
-def fetch_yfinance(
-    symbols: List[str],
-    start: str = "2015-01-01",
-    end: Optional[str] = None,
-) -> pd.DataFrame:
-    """
-    用 yfinance 批量下载日线数据。
-
-    Returns
-    -------
-    pd.DataFrame
-        MultiIndex columns: (ticker, field)，field ∈ {Open,High,Low,Close,Volume}
-    """
-    import yfinance as yf
-
-    if end is None:
-        end = datetime.today().strftime("%Y-%m-%d")
-
-    session = _make_yf_session()
-    all_frames: List[pd.DataFrame] = []
-
-    # 分批下载，避免一次请求过多标的触发限流
-    for i in range(0, len(symbols), YF_BATCH_SIZE):
-        batch = symbols[i:i + YF_BATCH_SIZE]
-        logger.info(f"  [{i + 1}~{i + len(batch)}/{len(symbols)}] {batch}")
-        for attempt in range(3):
-            try:
-                raw = yf.download(
-                    " ".join(batch),
-                    start=start,
-                    end=end,
-                    progress=False,
-                    auto_adjust=False,
-                    actions=False,
-                    session=session,
-                    group_by="ticker",
-                )
-                if not raw.empty:
-                    all_frames.append(raw)
-                else:
-                    logger.warning(f"    空数据，可能限流")
-                break
-            except Exception as e:
-                logger.warning(f"    下载失败 (attempt {attempt + 1}/3): {str(e)[:80]}")
-                time.sleep(5 * (attempt + 1))
-        else:
-            logger.error(f"    批次 {batch} 3 次重试均失败")
-        time.sleep(YF_PAUSE)
-
-    if not all_frames:
-        raise RuntimeError("yfinance 所有批次下载均失败——请检查代理是否开启")
-
-    raw = pd.concat(all_frames, axis=1)
-    # 归一化列格式为 (ticker, field)
-    if isinstance(raw.columns, pd.MultiIndex):
-        raw.columns = pd.MultiIndex.from_tuples(
-            [(t, f) for t, f in raw.columns],
-            names=["ticker", "field"],
-        )
-    else:
-        # 单标的情况
-        sym = symbols[0]
-        raw.columns = pd.MultiIndex.from_product([[sym], raw.columns])
-
-    # 标准化字段名：去掉 Adj Close（只用 Close）, 保留 5 个标准字段
-    keep = ["Open", "High", "Low", "Close", "Volume"]
-    raw = raw.loc[:, (slice(None), keep)]
-
-    raw = raw.dropna(how="all").sort_index(axis=1)
-    return raw
-
-
-# ---------------------------------------------------------------------------
-# Alpha Vantage 后端（兜底，无需代理，但免费层仅 100 天）
-# ---------------------------------------------------------------------------
-
-def _av_request(params: Dict) -> Optional[dict]:
-    key = get_av_key()
-    if not key:
-        logger.error("未配置 ALPHA_VANTAGE_KEY，无法使用 Alpha Vantage 兜底")
-        return None
-
-    params["apikey"] = key
-    proxies = get_proxies()
-
-    for attempt in range(3):
-        try:
-            time.sleep(AV_CALL_INTERVAL)
-            resp = requests.get(
-                "https://www.alphavantage.co/query",
-                params=params,
-                timeout=30,
-                proxies=proxies,
-            )
-            if resp.status_code == 429:
-                logger.warning("AV 限流，等待 60s...")
-                time.sleep(60)
-                continue
-            data = resp.json()
-            if "Error Message" in data:
-                logger.error(f"AV API 错误: {data['Error Message']}")
-                return None
-            if "Information" in data:
-                logger.warning(f"AV 提示: {data['Information'][:120]}")
-                return None
-            if "Note" in data:
-                logger.warning(f"AV 频率提醒: {data['Note'][:100]}")
-                time.sleep(60)
-                continue
-            return data
-        except requests.exceptions.Timeout:
-            logger.warning(f"AV 请求超时，重试 {attempt + 1}/3")
-            time.sleep(30)
-        except requests.exceptions.RequestException as e:
-            logger.warning(f"AV 连接失败，重试 {attempt + 1}/3: {str(e)[:60]}")
-            time.sleep(30)
-    return None
-
-
-def fetch_alpha_vantage(symbols: List[str]) -> pd.DataFrame:
-    """Alpha Vantage 批量下载。注意：免费层 outputsize=compact 仅返回最近 100 天。"""
-    logger.warning("⚠️  Alpha Vantage 免费层仅返回最近 100 天数据，"
-                   "不足以计算 200 日均线等因子。建议优先使用 yfinance + 代理。")
-
-    all_data: Dict[str, pd.DataFrame] = {}
-    for i, sym in enumerate(symbols):
-        logger.info(f"  [{i + 1}/{len(symbols)}] {sym}")
-        data = _av_request({
-            "function": "TIME_SERIES_DAILY",
-            "symbol": sym,
-            "outputsize": "compact",
-            "datatype": "json",
-        })
-        if data is None or "Time Series (Daily)" not in data:
-            logger.warning(f"    ❌ {sym} 下载失败")
-            continue
-
-        rows = []
-        for date_str, v in data["Time Series (Daily)"].items():
-            rows.append({
-                "Date": pd.Timestamp(date_str),
-                "Open": float(v["1. open"]),
-                "High": float(v["2. high"]),
-                "Low": float(v["3. low"]),
-                "Close": float(v["4. close"]),
-                "Volume": int(v["5. volume"]),
-            })
-        df = pd.DataFrame(rows).sort_values("Date").set_index("Date")
-        all_data[sym] = df
-        logger.info(f"    ✅ {sym}: {len(df)} 条")
-
-    if not all_data:
-        raise RuntimeError("Alpha Vantage 所有标的下载均失败")
-
-    parts = []
-    for sym, df in all_data.items():
-        df.columns = pd.MultiIndex.from_product([[sym], df.columns])
-        parts.append(df)
-    return pd.concat(parts, axis=1).sort_index(axis=1)
 
 
 # ---------------------------------------------------------------------------
@@ -242,33 +51,22 @@ def fetch_all_data(
     backend : str, optional
         'yfinance' 或 'alpha_vantage'，默认从 .env 读取
     """
-    # 缓存检查
-    if not force_refresh and CACHE_FILE.exists():
-        cached = pd.read_parquet(CACHE_FILE)
-        idx = cached.index
-        last = idx.max() if isinstance(idx, pd.DatetimeIndex) else idx.get_level_values("Date").max()
-        age = (pd.Timestamp.today() - last).days
-        if age <= STALE_DAYS:
-            logger.info(f"📂 缓存有效（{age} 天前更新），跳过下载")
-            return cached
-        logger.info(f"⚠️  缓存距今 {age} 天，重新下载")
+    cache = CacheManager(CACHE_FILE, STALE_DAYS)
+    cached = cache.load_or_fresh(force_refresh)
+    if cached is not None:
+        return cached
 
     symbols = list(symbols or TRADE_UNIVERSE)
     if max_symbols:
         symbols = symbols[:max_symbols]
 
-    backend = (backend or get_backend()).lower()
-    logger.info(f"🌐 数据后端: {backend}，标的数: {len(symbols)}")
+    backend_name = (backend or get_config_backend()).lower()
+    logger.info(f"🌐 数据后端: {backend_name}，标的数: {len(symbols)}")
 
-    if backend == "yfinance":
-        df = fetch_yfinance(symbols)
-    elif backend in ("alpha_vantage", "av"):
-        df = fetch_alpha_vantage(symbols)
-    else:
-        raise ValueError(f"未知后端: {backend}（应为 yfinance 或 alpha_vantage）")
+    instance = resolve_backend(backend_name)
+    df = instance.fetch(symbols)
 
-    df.to_parquet(CACHE_FILE)
-    logger.info(f"💾 已缓存到 {CACHE_FILE}（{df.shape[0]} 天 × {df.shape[1]} 列）")
+    cache.save(df)
     return df
 
 
