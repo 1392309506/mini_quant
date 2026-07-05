@@ -131,6 +131,62 @@ def clip_outliers(
     return df
 
 
+def add_cross_sectional_features(
+    df: pd.DataFrame,
+    feature_cols: List[str],
+) -> pd.DataFrame:
+    """
+    添加横截面特征：排名和 Z-score，增强模型横截面区分能力。
+
+    对每个原始因子 X，生成两个新特征：
+      - X_rank: 截面排名归一化到 [0, 1]（高=该因子截面最高）
+      - X_zscore: 截面 Z-score（相对位置的标准差倍数）
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        堆叠后的训练数据，索引 (Date, ticker)。
+    feature_cols : list[str]
+        要转化的原始因子列名。
+
+    Returns
+    -------
+    pd.DataFrame
+        添加了截面特征的副本。
+    """
+    df = df.copy()
+    n_new = 0
+
+    for col in feature_cols:
+        if col not in df.columns:
+            continue
+
+        # 截面排名 (0~1)
+        rank_col = f"{col}_rank"
+        # groupby(level="Date") 对每个日期独立排名
+        df[rank_col] = (
+            df.groupby(level="Date")[col]
+            .rank(pct=True)
+        )
+        n_new += 1
+
+        # 截面 Z-score
+        z_col = f"{col}_zscore"
+        grouped = df.groupby(level="Date")[col]
+        means = grouped.transform("mean")
+        stds = grouped.transform("std").fillna(1.0)
+        df[z_col] = (df[col] - means) / stds
+        df[z_col] = df[z_col].clip(-5, 5)  # 截断极端 Z-score
+        n_new += 1
+
+    logger.info(
+        f"📊 横截面特征已添加: {n_new} 个新特征 "
+        f"(每因子 × rank + zscore)"
+    )
+
+    return df
+
+
 def build_walk_forward_windows(
     dates: pd.DatetimeIndex,
     initial_train_years: float = 6.0,

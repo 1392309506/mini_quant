@@ -118,7 +118,17 @@ def _compute_portfolio_metrics(pf) -> Dict:
 
         try:
             trades = pf.trades
-            if isinstance(trades, dict):
+            # vectorbt ExitTrades (新版本): 直接调用内置方法
+            if hasattr(trades, "count") and not isinstance(trades, pd.DataFrame):
+                num_trades = trades.count()
+                if num_trades > 0:
+                    win_rate = float(trades.win_rate())
+                    profit_factor = float(trades.profit_factor()) if float(trades.profit_factor()) != float("inf") else 0
+                else:
+                    win_rate = 0
+                    profit_factor = 0
+            elif isinstance(trades, dict):
+                # 多标的 (旧版 dict of DataFrame)
                 all_trades = pd.concat(trades.values(), ignore_index=True)
                 num_trades = len(all_trades)
                 if num_trades > 0:
@@ -131,6 +141,7 @@ def _compute_portfolio_metrics(pf) -> Dict:
                     win_rate = 0
                     profit_factor = 0
             else:
+                # DataFrame (旧版单标的)
                 num_trades = len(trades)
                 if num_trades > 0:
                     win_rate = (trades["pnl"] > 0).sum() / num_trades
@@ -147,7 +158,11 @@ def _compute_portfolio_metrics(pf) -> Dict:
             profit_factor = 0
 
         try:
-            total_fees = pf.fees().sum().sum()
+            fees = pf.fees()
+            if hasattr(fees, "sum"):
+                total_fees = float(fees.sum())
+            else:
+                total_fees = 0
         except Exception:
             total_fees = 0
 

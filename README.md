@@ -167,7 +167,7 @@ Quant/
 - [x] 数据采集 + 因子计算
 - [x] 工程化重构（配置中心、Backend 协议、IO 层拆分）
 - [x] 模型训练（LightGBM + Walk-Forward）— v0.3.0 ✅
-- [~] 回测验证（vectorbt）— v0.4.0（代码跑通，效果待优化，暂不发版）
+- [~] 回测验证（vectorbt, 24 特征含横截面, 1.4% 总收益/3年, WinRate 48.7%）— v0.4.0 待优化
 - [x] 包工程化（pyproject.toml 可安装 + 子包结构）— v0.3.0
 - [ ] 因子探索优化（Jupyter 可视化、参数调优）
 - [ ] 实盘执行（MetaTrader5 对接 Exness）

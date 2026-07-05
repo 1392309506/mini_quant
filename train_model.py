@@ -31,6 +31,7 @@ from src.factors import build_factor_panel
 from src.data.label import compute_forward_returns, DEFAULT_PERIODS
 from src.data.preprocess import (
     prepare_training_data,
+    add_cross_sectional_features,
     clip_outliers,
     build_walk_forward_windows,
 )
@@ -171,8 +172,13 @@ def main():
     data = prepare_training_data(factor_panel, closes)
     logger.info(f"   训练数据: {data.shape}")
 
-    # 4. 缩尾处理
-    data = clip_outliers(data, FEATURE_COLS, CLIP_STD_THRESHOLD)
+    # 3b. 添加横截面特征（排名 + Z-score）
+    logger.info("📊 添加横截面特征...")
+    data = add_cross_sectional_features(data, FEATURE_COLS[:8])
+    logger.info(f"   横截面特征后: {data.shape}, 特征数={len(FEATURE_COLS)}")
+
+    # 4. 缩尾处理（只对原始因子，不对 rank/zscore）
+    data = clip_outliers(data, FEATURE_COLS[:8], CLIP_STD_THRESHOLD)
 
     # 5. 构建 Walk-Forward 窗口
     dates = data.index.get_level_values("Date").unique()

@@ -1,0 +1,7 @@
+docs: 实验手册 + 横截面特征 + 回测指标修复
+
+- 新增 docs/实验手册.md：实验流程、指标解读、调参指南
+- 添加横截面特征：rank + z-score (每个因子×2)，显著提升预测区分度
+- 修复回测指标提取：正确读取 vectorbt ExitTrades 对象，0→1416 笔交易
+- 调优模型参数：lr 0.05→0.01, num_leaves 31→63, min_data 50→10, early_stop 50→200
+- 修复 .gitignore 中 data/ 误匹配 src/data/
