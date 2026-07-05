@@ -2,34 +2,22 @@
 Fetcher — 数据下载与管理模块（高层编排层）
 
 通过 io/ 子包中的 DataBackend 注册表分发到具体后端。
-yfinance / Alpha Vantage 的具体实现已移至 quant/io/。
 """
 
-import json
 import logging
 from typing import Optional, List, Dict
 
 import pandas as pd
-import numpy as np
 
-from quant.config import (
-    DATA_DIR,
-    CACHE_FILE,
-    STALE_DAYS,
-    get_backend as get_config_backend,
-)
-from quant.universe import TRADE_UNIVERSE
-from quant.io import get_backend as resolve_backend
-from quant.io.cache import CacheManager
+from src.config import DATA_DIR, CACHE_FILE, STALE_DAYS, get_backend as get_config_backend
+from src.universe import TRADE_UNIVERSE
+from src.io import get_backend as resolve_backend
+from src.io.cache import CacheManager
 
 logger = logging.getLogger(__name__)
 
 DATA_DIR.mkdir(exist_ok=True)
 
-
-# ---------------------------------------------------------------------------
-# 统一入口
-# ---------------------------------------------------------------------------
 
 def fetch_all_data(
     symbols: Optional[List[str]] = None,
@@ -70,10 +58,6 @@ def fetch_all_data(
     return df
 
 
-# ---------------------------------------------------------------------------
-# 数据完整性检查
-# ---------------------------------------------------------------------------
-
 def check_data_integrity(df: pd.DataFrame) -> Dict[str, list]:
     """检查 MultiIndex DataFrame 的数据完整性"""
     issues: Dict[str, list] = {}
@@ -87,7 +71,9 @@ def check_data_integrity(df: pd.DataFrame) -> Dict[str, list]:
         if nan_count > 0:
             nan_fields = [c for c in prices.columns if prices[c].isna().any()]
             nan_ratio = nan_count / (prices.shape[0] * prices.shape[1])
-            tk_issues.append(f"缺失值: {nan_count}个({nan_ratio:.1%}), 字段: {nan_fields}")
+            tk_issues.append(
+                f"缺失值: {nan_count}个({nan_ratio:.1%}), 字段: {nan_fields}"
+            )
 
         for col in ["Open", "High", "Low", "Close"]:
             if col in prices.columns:
@@ -137,10 +123,6 @@ def print_integrity_report(issues: Dict[str, list]) -> None:
                 logger.info(f"  [{ticker}] {msg}")
 
 
-# ---------------------------------------------------------------------------
-# 便利函数
-# ---------------------------------------------------------------------------
-
 def extract_close_matrix(df: pd.DataFrame) -> pd.DataFrame:
     """提取收盘价矩阵"""
     return df.xs("Close", axis=1, level=1).sort_index(axis=1).sort_index()
@@ -154,22 +136,3 @@ def extract_volume_matrix(df: pd.DataFrame) -> pd.DataFrame:
 def load_data() -> pd.DataFrame:
     """一键加载数据"""
     return fetch_all_data(force_refresh=False)
-
-
-# ---------------------------------------------------------------------------
-# 命令行入口
-# ---------------------------------------------------------------------------
-
-if __name__ == "__main__":
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s | %(levelname)-8s | %(message)s",
-        datefmt="%H:%M:%S",
-    )
-    logger.info("Fetcher 启动")
-    df = fetch_all_data(force_refresh=False)
-    closes = extract_close_matrix(df)
-    logger.info(f"收盘价矩阵: {closes.shape}, {len(closes.columns)} 个标的")
-    issues = check_data_integrity(df)
-    print_integrity_report(issues)
-    logger.info("完成")

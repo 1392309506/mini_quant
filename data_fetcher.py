@@ -10,7 +10,7 @@ data_fetcher.py — 入口脚本
 
 import sys
 import logging
-from quant.fetcher import (
+from src.data.fetcher import (
     fetch_all_data,
     extract_close_matrix,
     check_data_integrity,

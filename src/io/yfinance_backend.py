@@ -12,8 +12,8 @@ from typing import List, Optional
 import pandas as pd
 import requests
 
-from quant.io.base import DataBackend
-from quant.config import YF_BATCH_SIZE, YF_PAUSE, get_proxies
+from src.io.base import DataBackend
+from src.config import YF_BATCH_SIZE, YF_PAUSE, get_proxies
 
 logger = logging.getLogger(__name__)
 

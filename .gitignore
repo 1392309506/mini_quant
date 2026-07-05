@@ -38,7 +38,10 @@ ENV/
 notes/
 
 # === 数据缓存（代码自动创建目录，不入库）===
-data/
+/data/
+
+# === 实验输出（体积大，不入库）===
+experiments/
 
 # === 测试 / 覆盖率 ===
 .pytest_cache/

@@ -49,23 +49,45 @@ python factor_engine.py
 
 ```
 Quant/
-├── quant/                   # 核心库（包）
-│   ├── config.py            # 集中配置（缓存、代理、批大小等稳定参数）
-│   ├── universe.py          # 交易标的池加载器（读取 universe.txt）
-│   ├── universe.txt          # 交易标的池（一行一个 ticker，# 注释分割板块）
-│   ├── io/                  # 数据后端层（DataBackend 协议）
-│   │   ├── base.py          #   DataBackend 抽象协议
-│   │   ├── cache.py         #   parquet 缓存管理
-│   │   ├── yfinance_backend.py  # yfinance 实现（默认）
-│   │   ├── alpha_vantage.py     # Alpha Vantage 兜底
-│   │   └── mt5_backend.py       # MT5 实盘报价（预留）
-│   ├── fetcher.py           # 数据获取编排层（注册表分发）
-│   ├── engine.py            # 因子计算引擎
-│   └── factor.py            # 因子模块公开接口
+├── quant/                   # 核心库（pip install -e . 可安装）
+│   ├── __init__.py          # 版本号 + 顶层导出
+│   ├── config.py            # 配置中心（路径、代理、后端选择）
+│   ├── universe.py/.txt     # 交易标的池
+│   ├── experiment.py        # 实验保存/加载
+│   ├── data/                # 数据流水线
+│   │   ├── fetcher.py       #   数据下载 + 缓存 + 完整性检查
+│   │   ├── label.py         #   远期收益标签计算
+│   │   └── preprocess.py    #   训练数据准备 + Walk-Forward 窗口
+│   ├── factors/             # 因子计算（8 个纯函数因子）
+│   │   ├── momentum.py      #   MOMO_20, MOMO_60, MOM_RATIO
+│   │   ├── mean_reversion.py #  RSI_14, BB_POS, VOL_MA_RATIO
+│   │   ├── volatility.py    #   ATR_20, VOLATILITY_20
+│   │   ├── regime.py        #   market_regime_filter
+│   │   ├── assembly.py      #   因子组装器
+│   │   └── validation.py    #   因子质量检查
+│   ├── models/              # 模型训练与信号
+│   │   ├── config.py        #   训练超参数
+│   │   ├── trainer.py       #   LightGBM Walk-Forward 训练
+│   │   └── signals.py       #   交易信号生成
+│   ├── backtest/            # 回测
+│   │   ├── config.py        #   回测参数
+│   │   ├── engine.py        #   vectorbt 包装器
+│   │   └── reporting.py     #   报告 + 图表
+│   └── io/                  # 数据后端（DataBackend 协议）
+│       ├── base.py          #   DataBackend 抽象协议
+│       ├── cache.py         #   parquet 缓存管理
+│       ├── yfinance_backend.py # yfinance 实现（默认）
+│       ├── alpha_vantage.py    # Alpha Vantage 兜底
+│       └── mt5_backend.py      # MT5 实盘报价（预留）
 ├── data/                    # 数据缓存（.gitignore 忽略）
+├── experiments/             # 实验输出（模型、预测、回测报告）
 ├── docs/                    # 文档
+├── notes/                   # 调研笔记与学习文档
 ├── data_fetcher.py          # 数据获取入口
 ├── factor_engine.py         # 因子计算入口
+├── train_model.py           # 模型训练入口
+├── run_backtest.py          # 回测入口
+├── pyproject.toml           # 包元数据（pip install -e .）
 ├── requirements.txt
 ├── .env.example             # 配置模板
 └── .gitignore
@@ -76,8 +98,52 @@ Quant/
 ## 数据流
 
 ```
-.env (代理/Key)  ──►  config.py  ──►  io/  ──►  data/market_data.parquet  ──►  engine  ──►  factor panel
-                       (配置中心)        (DataBackend 注册表)   (MultiIndex: ticker×OHLCV)        (ticker×factor)
+                            ┌──────────────────────────────────┐
+                            │         数据获取 (Stage 1)       │
+                            │  data_fetcher.py                 │
+                            │  └─ src.data.fetcher           │
+                            │       ├─ io/ backend (yfinance)  │
+                            │       └─ data/market_data.parquet│
+                            └──────────┬───────────────────────┘
+                                       │ OHLCV MultiIndex
+                                       ▼
+                            ┌──────────────────────────────────┐
+                            │         因子计算 (Stage 2)       │
+                            │  factor_engine.py                │
+                            │  └─ src.factors.assembly       │
+                            │       ├─ momentum.py             │
+                            │       ├─ mean_reversion.py       │
+                            │       └─ volatility.py           │
+                            └──────────┬───────────────────────┘
+                                       │ factor_panel (ticker×8因子)
+                                       ▼
+                            ┌──────────────────────────────────┐
+                            │   标签 & 预处理 (Stage 3)       │
+                            │  ├─ src.data.label             │
+                            │  │    (forward_return_{5,10,21}) │
+                            │  └─ src.data.preprocess        │
+                            │       (堆叠 + 缩尾 + WF windows) │
+                            └──────────┬───────────────────────┘
+                                       │ training_data (Date,ticker)
+                                       ▼
+                            ┌──────────────────────────────────┐
+                            │       模型训练 (Stage 4)         │
+                            │  train_model.py                  │
+                            │  └─ src.models.trainer         │
+                            │       (LightGBM Walk-Forward)    │
+                            └──────────┬───────────────────────┘
+                                       │ 预测 + 模型文件
+                                       ▼
+                            ┌──────────────────────────────────┐
+                            │  信号生成 & 回测 (Stage 5)      │
+                            │  run_backtest.py                 │
+                            │  ├─ src.models.signals         │
+                            │  │    (调仓日历 + 入场/出场)     │
+                            │  ├─ src.backtest.engine        │
+                            │  │    (vectorbt Portfolio)       │
+                            │  └─ src.backtest.reporting     │
+                            │       (equity curve + 指标)      │
+                            └──────────────────────────────────┘
 ```
 
 ---
@@ -99,10 +165,11 @@ Quant/
 ## 路线图
 
 - [x] 数据采集 + 因子计算
-- [ ] 工程化重构（配置中心、Backend 协议、统一 CLI、pytest）— 见 [docs/工程化改造.md](docs/工程化改造.md)
-- [ ] 因子探索（Jupyter 可视化）
-- [ ] 模型训练（LightGBM + Walk-Forward）
-- [ ] 回测验证（vectorbt）
+- [x] 工程化重构（配置中心、Backend 协议、IO 层拆分）
+- [x] 模型训练（LightGBM + Walk-Forward）— v0.3.0 ✅
+- [~] 回测验证（vectorbt）— v0.4.0（代码跑通，效果待优化，暂不发版）
+- [x] 包工程化（pyproject.toml 可安装 + 子包结构）— v0.3.0
+- [ ] 因子探索优化（Jupyter 可视化、参数调优）
 - [ ] 实盘执行（MetaTrader5 对接 Exness）
 
 ---

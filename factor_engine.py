@@ -19,12 +19,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger("factor_engine")
 
-from quant.fetcher import (
+from src.data.fetcher import (
     fetch_all_data,
     extract_close_matrix,
     extract_volume_matrix,
 )
-from quant.factor import build_factor_panel, validate_factors
+from src.factors import build_factor_panel, validate_factors
 
 
 def main():

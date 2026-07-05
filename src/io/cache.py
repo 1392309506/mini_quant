@@ -9,7 +9,7 @@ from typing import Optional
 
 import pandas as pd
 
-from quant.config import CACHE_FILE, STALE_DAYS, DATA_DIR
+from src.config import CACHE_FILE, STALE_DAYS, DATA_DIR
 
 logger = logging.getLogger(__name__)
 

@@ -1,21 +1,21 @@
 """
-quant.io — 数据后端 IO 层
+src.io — 数据后端 IO 层
 
 提供 DataBackend 协议和注册表，支持按名称获取后端实例。
 开闭原则：加新数据源只需实现 DataBackend 并注册，不改分发代码。
 
 用法:
-    from quant.io import get_backend
+    from src.io import get_backend
     backend = get_backend("yfinance")
     df = backend.fetch(["AAPL", "MSFT"])
 """
 
 from typing import Type
 
-from quant.io.base import DataBackend
-from quant.io.yfinance_backend import YFinanceBackend
-from quant.io.alpha_vantage import AlphaVantageBackend
-from quant.io.mt5_backend import MT5Backend
+from src.io.base import DataBackend
+from src.io.yfinance_backend import YFinanceBackend
+from src.io.alpha_vantage import AlphaVantageBackend
+from src.io.mt5_backend import MT5Backend
 
 # ---------------------------------------------------------------------------
 # 注册表

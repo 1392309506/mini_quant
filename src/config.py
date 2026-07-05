@@ -4,9 +4,9 @@ config.py — 集中配置模块
 读取顺序：环境变量 > .env 文件 > 代码默认值。
 
 用法:
-    from quant.config import DATA_DIR, get_backend, get_proxies
+    from src.config import DATA_DIR, EXPERIMENTS_DIR, get_backend, get_proxies
 
-交易标的池已移入 quant/universe.py（经常调整），不在此处定义。
+交易标的池已移入 src/universe.py（经常调整），不在此处定义。
 """
 
 from pathlib import Path
@@ -21,6 +21,7 @@ from dotenv import load_dotenv
 PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 DATA_DIR = PROJECT_ROOT / "data"
 CACHE_FILE = DATA_DIR / "market_data.parquet"
+EXPERIMENTS_DIR = PROJECT_ROOT / "experiments"
 
 # ---------------------------------------------------------------------------
 # 加载 .env（环境变量优先级高于 .env 文件中的值）

@@ -11,8 +11,8 @@ from typing import List, Optional, Dict
 import pandas as pd
 import requests
 
-from quant.io.base import DataBackend
-from quant.config import AV_CALL_INTERVAL, get_proxies, get_av_key
+from src.io.base import DataBackend
+from src.config import AV_CALL_INTERVAL, get_proxies, get_av_key
 
 logger = logging.getLogger(__name__)
 
