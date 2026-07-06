@@ -5,7 +5,7 @@ Quant Trading System — 自动化量化交易核心模块
 技术因子 + 横截面模型 + LightGBM 预测 + vectorbt 回测。
 """
 
-__version__ = "0.3.0"
+__version__ = "0.5.0"
 
 # 数据层
 from src.data.fetcher import (

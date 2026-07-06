@@ -21,6 +21,9 @@ RANGES = {
     "VOLATILITY_20": (0, 0.1),
     "BB_WIDTH": (0, 1),
     "HIGH_LOW_RATIO": (0, 0.3),
+    "CHAIKIN_MF": (-1, 1),
+    "ULCER_INDEX": (0, 0.3),
+    "MAX_DD_60": (-1, 0),
 }
 
 

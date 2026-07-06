@@ -172,7 +172,7 @@ def main():
     data = prepare_training_data(factor_panel, closes)
     logger.info(f"   训练数据: {data.shape}")
 
-    N_BASE_FEATURES = 10  # 8 旧 + 2 新
+    N_BASE_FEATURES = 13  # 10 旧 + 3 新 (CHAIKIN_MF, ULCER_INDEX, MAX_DD_60)
 
     # 3b. 添加横截面特征（排名 + Z-score）
     logger.info("📊 添加横截面特征...")

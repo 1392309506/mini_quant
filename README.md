@@ -9,8 +9,8 @@
 ## 特性
 
 - **多后端数据采集**：yfinance（默认，数据全）+ Alpha Vantage（兜底，无需代理），统一缓存为 parquet。
-- **10 个技术因子**：动量（MOMO_20/60、MOM_RATIO）、均值回归（RSI_14、BB_POS、VOL_MA_RATIO）、波动率（ATR_20_NORM、VOLATILITY_20）、统计拓展（BB_WIDTH、HIGH_LOW_RATIO），均为纯函数，可独立测试。
-- **因子探索**：持续因子寻找流程（factor_hunt.py），以 IC/ICIR/层组合单调性为筛选标准，当前已测试 28 个候选因子，发现 2 个有效因子。
+- **13 个技术因子**：动量（MOMO_20/60、MOM_RATIO）、均值回归（RSI_14、BB_POS、VOL_MA_RATIO）、波动率（ATR_20_NORM、VOLATILITY_20）、统计拓展（BB_WIDTH、HIGH_LOW_RATIO、ULCER_INDEX、MAX_DD_60）、资金流（CHAIKIN_MF），均为纯函数，可独立测试。
+- **因子探索**：持续因子寻找流程（factor_hunt.py），以 IC/ICIR/层组合单调性为筛选标准，当前已测试 28 个候选因子，发现 5 个有效因子。
 - **增量更新**：parquet 缓存，7 天内不重复下载。
 - **代理友好**：自动为 yfinance 注入 HTTP 代理（v2rayN/Clash）。
 
@@ -79,11 +79,11 @@ Quant/
 │   │   ├── fetcher.py       #   数据下载 + 缓存 + 完整性检查
 │   │   ├── label.py         #   远期收益标签计算
 │   │   └── preprocess.py    #   训练数据准备 + Walk-Forward 窗口
-│   ├── factors/             # 因子计算（10 个纯函数因子）
+│   ├── factors/             # 因子计算（13 个纯函数因子）
 │   │   ├── momentum.py      #   MOMO_20, MOMO_60, MOM_RATIO
 │   │   ├── mean_reversion.py #  RSI_14, BB_POS, VOL_MA_RATIO
 │   │   ├── volatility.py    #   ATR_20, VOLATILITY_20
-│   │   ├── new_factors.py   #   BB_WIDTH, HIGH_LOW_RATIO (因子探索池)
+│   │   ├── new_factors.py   #   BB_WIDTH, HIGH_LOW_RATIO, ULCER_INDEX, MAX_DD_60, CHAIKIN_MF
 │   │   ├── regime.py        #   market_regime_filter
 │   │   ├── assembly.py      #   因子组装器
 │   │   └── validation.py    #   因子质量检查
@@ -189,14 +189,17 @@ Quant/
 
 - [x] 数据采集 + 因子计算
 - [x] 工程化重构（配置中心、Backend 协议、IO 层拆分）
-- [x] 模型训练（LightGBM + Walk-Forward, 30 特征含横截面, 10 个基础因子）— v0.3.0 ✅
+- [x] 模型训练（LightGBM + Walk-Forward, 39 特征含横截面, 13 个基础因子）— v0.3.0 ✅
 - [x] 回测验证（vectorbt, 年化 64%~81%, 夏普 4.9~5.8）— v0.4.0 ✅
 - [x] 扩大标的池（118 只股票全链路训练+回测）— v0.4.0
-- [x] 因子探索（已测试 28 候选因子，2 个有效因子 BB_WIDTH/HIGH_LOW_RATIO）— v0.4.0
-- [ ] 回测有效性验证（Rolling OOS 交叉验证）
-- [ ] 模型存储至独立 models/ 目录
-- [ ] 实盘执行（MetaTrader5 对接 Exness）
-- [ ] 风控与仓位管理
+- [x] 因子探索（已测试 28 候选因子，13 个因子已集成至代码）— v0.4.0
+- [x] 实盘就绪评估（结论：研究原型，不可实盘）
+- [ ] **回测有效性验证**（Rolling OOS 交叉验证 / Permutation Test / 随机基线）
+- [ ] 模型存储至独立 models/ 目录 + 每日推理 pipeline
+- [ ] 执行层搭建（MetaTrader5 对接 Exness）
+- [ ] 风控与仓位管理（止损/杠杆限制/每日交易次数上限）
+- [ ] 模拟盘运行（Exness Demo, 1-3 个月）
+- [ ] 实盘（极小资金起步）
 
 ---
 

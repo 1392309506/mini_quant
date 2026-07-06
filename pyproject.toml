@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "quant-trading"
-version = "0.3.0"
+version = "0.5.0"
 description = "自动化量化交易系统 — 中低频 Swing 交易，技术因子 + 横截面模型"
 readme = "README.md"
 requires-python = ">=3.10"
