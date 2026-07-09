@@ -9,6 +9,7 @@
 | 脚本 | 作用 | 文档 |
 |:---|:---|:---:|
 | `daily_inference.py` | 每日信号生成 Pipeline | [下文](#daily_inferencepy) |
+| `run_simulation.py` | 模拟盘自动交易循环 | [下文](#run_simulationpy) |
 | `test_execution.py` | 执行层组件验证 | [下文](#test_executionpy) |
 | `../train_model.py` | 模型训练入口 | [train_model.py](../train_model.py) |
 
@@ -81,6 +82,70 @@ data/signals/
 
 ---
 
+## run_simulation.py
+
+**模拟盘启动脚本** — 每日自动交易循环。
+
+### 功能
+
+```
+1. 调用 daily_inference 生成信号（或跳过，使用已有信号）
+2. 加载/恢复模拟账户状态（从 data/simulation_state.json）
+3. 处理出场信号 → 先平仓
+4. 硬止损检查
+5. 风控检查（杠杆/暴露/次数/单笔风险）→ 入场信号开仓
+6. 用最新行情更新持仓市值
+7. 输出每日摘要（持仓明细、盈亏、权益曲线）
+8. 保存状态（下次运行恢复）
+```
+
+### 用法
+
+```bash
+# 默认：V1 模型（28 只），$10,000 初始资金
+python scripts/run_simulation.py
+
+# 切换 V2 模型（118 只，需先下载完整数据）
+python scripts/run_simulation.py --model V2
+
+# 指定初始资金
+python scripts/run_simulation.py --initial-balance 50000
+
+# 不重新生成信号（使用已有信号文件）
+python scripts/run_simulation.py --no-inference
+
+# 指定杠杆和每期买入数
+python scripts/run_simulation.py --scale 7 --top-k 10
+```
+
+### 参数
+
+| 参数 | 默认 | 说明 |
+|:---|:---:|:---|
+| `--model` | V1 | 模型版本 (V1=28只, V2=118只) |
+| `--initial-balance` | 10000 | 初始资金 |
+| `--no-inference` | — | 跳过 daily_inference，使用已有信号 |
+| `--top-k` | 5 | 每期买入数 |
+| `--scale` | 7.0 | 杠杆倍数（受风控规则实际约束） |
+
+### 输出
+
+```
+data/execution_audit.csv       ← 每笔交易审计日志
+data/simulation_state.json     ← 状态快照（恢复用）
+终端每日摘要                   ← 持仓明细、盈亏、风控触发
+```
+
+### 依赖模块
+
+- `scripts.daily_inference` — 信号生成
+- `src.execution.broker` — 经纪商封装
+- `src.execution.risk` — 风控检查
+- `src.execution.order_manager` — 订单管理
+- `src.data.fetcher` — 行情获取
+
+---
+
 ## test_execution.py
 
 **执行层组件验证** — 验证 Broker / RiskManager / OrderManager 在模拟模式下的基本功能。
@@ -126,6 +191,8 @@ python train_model.py --load <exp_id>               # 加载已有实验结果
 
 ## 注意事项
 
-1. **V1 vs V2**: V2 需要 118 只标的完整数据池。当前只缓存了 28 只，请使用 `--model V1`。
+1. **V1 vs V2**: V2 需要 118 只标的完整数据池。当前缓存了 28 只标的，模拟盘默认使用 `--model V1`。
 2. **行情延迟**: 美股数据通常在北京时间凌晨更新。`--date` 默认今天，如果数据未就绪会发出警告，不影响正常使用。
-3. **信号覆盖**: 入场信号覆盖未来 90 天（保证 max_hold=30 的出场信号落在窗口内），但只有下一个交易日（`action_date`）的信号用于执行。
+3. **信号覆盖**: 入场信号覆盖未来 90 天（保证 max_hold=30 的出场信号落在窗口内），但只有最近一个交易日的信号用于执行。
+4. **模拟盘无需账号**: Broker(simulate=True) 纯本地模拟，不需要 MT5 或 Exness 账户。
+5. **状态持久化**: 模拟盘状态保存在 `data/simulation_state.json`，关机/重启后自动恢复。删除该文件即重置。
