@@ -2,7 +2,7 @@
 
 一个面向个人研究者的自动化量化交易系统：**数据采集 → 因子计算 → 模型训练 → 回测验证 → 实盘执行**。
 
-✅ **v0.4.0**: 数据采集、因子计算、模型训练、回测验证全链路已打通，回测验证通过。下一阶段：实盘执行与风控。
+✅ **v0.5.0**: 全链路完整版 — 数据采集 → 因子计算 → 模型训练 → 回测验证 → 每日信号 Pipeline → 模拟执行与风控。13 因子/39 特征，双模型 (V1/V2)，执行层可用。下一阶段：模拟盘运行与实盘过渡。
 
 ---
 
@@ -90,11 +90,16 @@ Quant/
 │   ├── models/              # 模型训练与信号
 │   │   ├── config.py        #   训练超参数
 │   │   ├── trainer.py       #   LightGBM Walk-Forward 训练
-│   │   └── signals.py       #   交易信号生成
+│   │   ├── signals.py       #   交易信号生成
+│   │   └── registry.py      #   Model Registry（models/ 目录管理）
 │   ├── backtest/            # 回测
 │   │   ├── config.py        #   回测参数
 │   │   ├── engine.py        #   vectorbt 包装器
 │   │   └── reporting.py     #   报告 + 图表
+│   ├── execution/           # 实盘执行与风控（模拟模式可用）
+│   │   ├── broker.py        #   MT5 经纪商封装（含模拟回退）
+│   │   ├── risk.py          #   风控检查与硬止损执行
+│   │   └── order_manager.py #   订单生命周期 + 审计日志
 │   └── io/                  # 数据后端（DataBackend 协议）
 │       ├── base.py          #   DataBackend 抽象协议
 │       ├── cache.py         #   parquet 缓存管理
@@ -103,8 +108,12 @@ Quant/
 │       └── mt5_backend.py      # MT5 实盘报价（预留）
 ├── data/                    # 数据缓存（.gitignore 忽略）
 ├── experiments/             # 实验输出（模型、预测、回测报告）
+├── models/                  # 可部署模型（V1, V2, Registry）
 ├── docs/                    # 文档
 ├── notes/                   # 调研笔记与学习文档
+├── scripts/                 # 操作脚本
+│   ├── daily_inference.py   #   每日信号生成 pipeline
+│   └── test_execution.py   #   执行层测试
 ├── data_fetcher.py          # 数据获取入口
 ├── factor_engine.py         # 因子计算入口
 ├── factor_hunt.py           # 因子寻找与评估
@@ -166,6 +175,16 @@ Quant/
                             │  │    (vectorbt Portfolio)       │
                             │  └─ src.backtest.reporting     │
                             │       (equity curve + 指标)      │
+                            └──────────┬───────────────────────┘
+                                       │ signals
+                                       ▼
+                            ┌──────────────────────────────────┐
+                            │ 每日推理 & 执行 (Stage 6)       │
+                            │  scripts/daily_inference.py      │
+                            │  ├─ 加载模型 (Model Registry)    │
+                            │  ├─ 因子计算 + 推理 → 信号       │
+                            │  └─ src.execution               │
+                            │       (Broker / Risk / Order)    │
                             └──────────────────────────────────┘
 ```
 
@@ -180,6 +199,8 @@ Quant/
 | `DATA_BACKEND` | `yfinance` 或 `alpha_vantage` | `yfinance` |
 | `HTTP_PROXY` / `HTTPS_PROXY` | 代理地址（v2rayN 默认 `http://127.0.0.1:10808`） | 无 |
 | `ALPHA_VANTAGE_KEY` | AV 兜底用 Key | 无 |
+| `MT5_LOGIN` / `MT5_PASSWORD` / `MT5_SERVER` | MT5 实盘凭证（可选，仅实盘模式需要） | 无 |
+| `MT5_RISK_MODE` | `simulate`（默认）或 `live` | `simulate` |
 
 > ⚠️ `.env` 含密钥，已被 `.gitignore` 忽略，**切勿提交**。
 
@@ -194,10 +215,10 @@ Quant/
 - [x] 扩大标的池（118 只股票全链路训练+回测）— v0.4.0
 - [x] 因子探索（已测试 28 候选因子，13 个因子已集成至代码）— v0.4.0
 - [x] 实盘就绪评估（结论：研究原型，不可实盘）
-- [ ] **回测有效性验证**（Rolling OOS 交叉验证 / Permutation Test / 随机基线）
-- [ ] 模型存储至独立 models/ 目录 + 每日推理 pipeline
-- [ ] 执行层搭建（MetaTrader5 对接 Exness）
-- [ ] 风控与仓位管理（止损/杠杆限制/每日交易次数上限）
+- [x] 回测有效性验证（Rolling OOS 交叉验证 / Permutation Test / 随机基线）
+- [x] 模型存储至独立 models/ 目录 + 每日推理 pipeline
+- [x] 执行层搭建（Broker / RiskManager / OrderManager）
+- [x] 风控与仓位管理（止损/杠杆限制/每日交易次数上限）
 - [ ] 模拟盘运行（Exness Demo, 1-3 个月）
 - [ ] 实盘（极小资金起步）
 

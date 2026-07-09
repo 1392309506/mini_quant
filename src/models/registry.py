@@ -37,7 +37,7 @@ def list_models() -> List[Dict]:
     versions = []
     for d in sorted(MODELS_ROOT.iterdir()):
         if d.is_dir() and (d / "manifest.json").exists():
-            with open(d / "manifest.json") as f:
+            with open(d / "manifest.json", encoding="utf-8") as f:
                 manifest = json.load(f)
             manifest["dir"] = str(d)
             versions.append(manifest)
@@ -80,7 +80,7 @@ def load_predictions(version: str) -> pd.DataFrame:
 def load_manifest(version: str) -> Dict:
     """加载指定版本的 manifest 元信息。"""
     model_dir = _resolve_version(version)
-    with open(model_dir / "manifest.json") as f:
+    with open(model_dir / "manifest.json", encoding="utf-8") as f:
         return json.load(f)
 
 

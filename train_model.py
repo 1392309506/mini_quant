@@ -3,14 +3,20 @@
 train_model.py — 模型训练入口脚本
 
 用法:
-  python train_model.py                          # 完整训练
-  python train_model.py --quick                  # 快速测试（5 个标的）
-  python train_model.py --target 21              # 预测 forward_return_21
-  python train_model.py --load <exp_id>          # 加载已有实验
+  python train_model.py                                 # 完整训练（默认全量标的）
+  python train_model.py --quick                         # 快速测试（5 个标的）
+  python train_model.py --target 21                     # 预测 forward_return_21
+  python train_model.py --version V3                    # 指定模型版本名
+  python train_model.py --universe 28                   # 只训练前 28 个标的
+  python train_model.py --version V3 --universe 28      # 组合使用
+  python train_model.py --load <exp_id>                 # 加载已有实验
 """
 
 import sys
+import json
 import logging
+from pathlib import Path
+from datetime import datetime
 from typing import Optional
 
 import pandas as pd
@@ -48,30 +54,85 @@ from src.models.config import (
     CLIP_STD_THRESHOLD,
 )
 from src.models.trainer import train_walk_forward
-from src.experiment import save_experiment, load_experiment
+from src.experiment import save_experiment, load_experiment, generate_experiment_id
+from src.config import MODELS_DIR
 
 
 def parse_args():
-    """解析命令行参数"""
+    """解析命令行参数。"""
     args = {
         "quick": "--quick" in sys.argv[1:],
         "load_mode": "--load" in sys.argv[1:],
         "target": DEFAULT_TARGET,
         "load_id": None,
+        "version": None,
+        "universe": None,
     }
 
     for i, arg in enumerate(sys.argv):
         if arg == "--target" and i + 1 < len(sys.argv):
             period = sys.argv[i + 1]
             args["target"] = f"forward_return_{period}"
-        if arg == "--load" and i + 1 < len(sys.argv):
+        elif arg == "--load" and i + 1 < len(sys.argv):
             args["load_id"] = sys.argv[i + 1]
+        elif arg == "--version" and i + 1 < len(sys.argv):
+            args["version"] = sys.argv[i + 1]
+        elif arg == "--universe" and i + 1 < len(sys.argv):
+            args["universe"] = int(sys.argv[i + 1])
 
     return args
 
 
+def save_to_models(config: dict, results: dict, version: str, n_tickers: int):
+    """将模型保存到 models/ 目录（Model Registry 格式）。"""
+    target = config.get("target", "forward_return_10")
+    target_days = target.replace("forward_return_", "fwd")
+    version_dir = MODELS_DIR / f"{version}_{n_tickers}stock_{target_days}"
+    version_dir.mkdir(parents=True, exist_ok=True)
+
+    # 保存模型文件
+    models_dir = version_dir / "models"
+    models_dir.mkdir(exist_ok=True)
+    for name, model in results.get("models", {}).items():
+        model.save_model(str(models_dir / f"{name}.txt"))
+    final_model = results.get("final_model")
+    if final_model is not None:
+        final_model.save_model(str(models_dir / "final.txt"))
+
+    # 特征重要性
+    importance = results.get("importance")
+    if importance is not None and len(importance) > 0:
+        importance.to_csv(version_dir / "feature_importance.csv", index=False)
+
+    # manifest.json
+    metrics = results.get("metrics")
+    manifest = {
+        "version": version,
+        "name": f"{version}_{n_tickers}stock_{target_days}",
+        "target": target,
+        "n_tickers": n_tickers,
+        "tickers": config.get("tickers"),
+        "n_features": len(FEATURE_COLS),
+        "feature_cols": FEATURE_COLS,
+        "n_windows": len(results.get("models", {})),
+        "avg_val_rmse": round(float(metrics["val_rmse"].mean()), 6)
+            if metrics is not None and len(metrics) > 0 else None,
+        "trained_at": datetime.now().isoformat(),
+        "walk_forward_params": {
+            "initial_train_years": WF_INITIAL_TRAIN_YEARS,
+            "val_years": WF_VAL_YEARS,
+            "step_years": WF_STEP_YEARS,
+            "test_years": WF_TEST_YEARS,
+        },
+    }
+    with open(version_dir / "manifest.json", "w", encoding="utf-8") as f:
+        json.dump(manifest, f, indent=2)
+
+    logger.info(f"💾 模型已保存到: {version_dir}")
+
+
 def print_summary(results: dict):
-    """打印训练结果摘要"""
+    """打印训练结果摘要。"""
     metrics = results.get("metrics")
     if metrics is None or len(metrics) == 0:
         logger.warning("⚠️  无有效的训练窗口")
@@ -82,9 +143,7 @@ def print_summary(results: dict):
     logger.info("📊 训练摘要")
     logger.info("=" * 60)
 
-    logger.info(
-        f"{'窗口':<8} {'Train RMSE':<14} {'Val RMSE':<14} {'Best Iter':<12}"
-    )
+    logger.info(f"{'窗口':<8} {'Train RMSE':<14} {'Val RMSE':<14} {'Best Iter':<12}")
     logger.info("-" * 50)
     for _, row in metrics.iterrows():
         logger.info(
@@ -154,14 +213,26 @@ def main():
 
     logger.info(f"📊 数据: {closes.shape[0]} 天 × {closes.shape[1]} 个标的")
 
-    # --quick 模式：只保留前 5 个标的
-    if args["quick"]:
-        tickers = closes.columns[:5].tolist()
-        logger.info(f"⚡ 快速模式: 仅使用 {len(tickers)} 个标的: {tickers}")
+    # --universe N：只保留前 N 个标的
+    if args["universe"] is not None:
+        tickers = closes.columns[:args["universe"]].tolist()
+        logger.info(
+            f"📌 标的池限制: 前 {args['universe']} 个标的 "
+            f"({tickers[0]}...{tickers[-1]})"
+        )
         closes = closes[tickers]
         volumes = volumes[tickers]
         highs = highs[tickers]
         lows = lows[tickers]
+    elif args["quick"]:
+        tickers = closes.columns[:5].tolist()
+        logger.info(f"⚡ 快速模式: 仅使用 5 个标的: {tickers}")
+        closes = closes[tickers]
+        volumes = volumes[tickers]
+        highs = highs[tickers]
+        lows = lows[tickers]
+
+    n_tickers = closes.shape[1]
 
     # 2. 计算因子
     logger.info("🔢 计算因子...")
@@ -172,14 +243,14 @@ def main():
     data = prepare_training_data(factor_panel, closes)
     logger.info(f"   训练数据: {data.shape}")
 
-    N_BASE_FEATURES = 13  # 10 旧 + 3 新 (CHAIKIN_MF, ULCER_INDEX, MAX_DD_60)
+    N_BASE_FEATURES = 13
 
-    # 3b. 添加横截面特征（排名 + Z-score）
+    # 3b. 添加横截面特征
     logger.info("📊 添加横截面特征...")
     data = add_cross_sectional_features(data, FEATURE_COLS[:N_BASE_FEATURES])
     logger.info(f"   横截面特征后: {data.shape}, 特征数={len(FEATURE_COLS)}")
 
-    # 4. 缩尾处理（只对原始因子，不对 rank/zscore）
+    # 4. 缩尾处理
     data = clip_outliers(data, FEATURE_COLS[:N_BASE_FEATURES], CLIP_STD_THRESHOLD)
 
     # 5. 构建 Walk-Forward 窗口
@@ -208,7 +279,7 @@ def main():
         early_stopping_rounds=EARLY_STOPPING_ROUNDS,
     )
 
-    # 7. 保存
+    # 7. 配置摘要
     config = {
         "quick": args["quick"],
         "target": args["target"],
@@ -216,7 +287,8 @@ def main():
         "lgbm_params": DEFAULT_LGBM_PARAMS,
         "num_boost_round": NUM_BOOST_ROUND,
         "early_stopping_rounds": EARLY_STOPPING_ROUNDS,
-        "n_tickers": len(closes.columns),
+        "n_tickers": n_tickers,
+        "tickers": closes.columns.tolist(),
         "n_dates": len(closes),
         "n_features": len(FEATURE_COLS),
         "walk_forward_params": {
@@ -227,12 +299,25 @@ def main():
         },
         "clip_std_threshold": CLIP_STD_THRESHOLD,
     }
+
+    # 8. 保存到 experiments/（实验记录）
     exp_path = save_experiment(config, results)
 
-    # 8. 打印摘要
+    # 9. 保存到 models/（可部署模型文件）
+    if args["version"]:
+        save_to_models(config, results, args["version"], n_tickers)
+
+    # 10. 打印摘要
     print_summary(results)
 
     logger.info(f"💾 实验已保存: {exp_path}")
+
+    if args["version"]:
+        version_name = f"{args['version']}_{n_tickers}stock_{args['target'].replace('forward_return_', 'fwd')}"
+        logger.info(f"💾 模型已保存: {MODELS_DIR / version_name}")
+    else:
+        logger.info("💡 提示: 用 --version <name> 同时保存模型到 models/ 目录")
+
     logger.info("✅ 训练完成")
 
 

@@ -56,10 +56,10 @@ def parse_args():
 
     for i, arg in enumerate(sys.argv[1:], 1):
         if arg.startswith("--"):
-            if arg == "--top" and i < len(sys.argv):
-                args["top_k"] = int(sys.argv[i])
-            elif arg == "--min-pred" and i < len(sys.argv):
-                args["min_pred"] = float(sys.argv[i])
+            if arg == "--top" and i + 1 < len(sys.argv):
+                args["top_k"] = int(sys.argv[i + 1])
+            elif arg == "--min-pred" and i + 1 < len(sys.argv):
+                args["min_pred"] = float(sys.argv[i + 1])
             continue
         if args["exp_id"] is None and not arg.startswith("--"):
             args["exp_id"] = arg

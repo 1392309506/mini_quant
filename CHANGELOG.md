@@ -31,6 +31,8 @@
 - docs/当前记录与更新计划.md 章节编号修复（两个"五"）
 - README/docs 中因子数/标的数/预期输出与实际同步
 - docs/交易频率影响分析.md 中调仓频率、交易成本、最短持仓与实际同步
+- scripts/daily_inference.py: 缺少 add_cross_sectional_features 和 clip_outliers 步骤，导致推理时特征数（16）与模型训练时（30）不匹配；兼容新旧 manifest 格式（features vs feature_cols），使用 model.feature_name() 作为最终特征列来源
+- src/models/registry.py: load_manifest() 缺少 encoding="utf-8"，导致中文 Windows (GBK) 下读取 manifest.json 失败
 
 ---
 

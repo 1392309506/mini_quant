@@ -107,6 +107,7 @@ def predict_oos(
     model: lgb.Booster,
     df: pd.DataFrame,
     feature_cols: Optional[List[str]] = None,
+    target_col: str = "forward_return_10",
 ) -> pd.DataFrame:
     """
     在 DataFrame 上运行 OOS 预测。
@@ -119,7 +120,7 @@ def predict_oos(
 
     result = pd.DataFrame({
         "pred": pred,
-        "actual": df.get("forward_return_10", np.nan),
+        "actual": df.get(target_col, np.nan),
     }, index=df.index)
 
     return result
@@ -187,7 +188,7 @@ def train_walk_forward(
             importance["window"] = window["name"]
             importance_list.append(importance)
 
-            pred_oos = predict_oos(model, val_df, feature_cols)
+            pred_oos = predict_oos(model, val_df, feature_cols, target_col)
             pred_oos["window"] = window["name"]
             pred_oos_list.append(pred_oos)
 
@@ -228,7 +229,7 @@ def train_walk_forward(
             early_stopping_rounds=early_stopping_rounds,
         )
         final_model.params["seed"] = 42
-        test_pred = predict_oos(final_model, test_df, feature_cols)
+        test_pred = predict_oos(final_model, test_df, feature_cols, target_col)
         test_pred["window"] = "test"
     else:
         logger.warning("⚠️  测试集数据不足，跳过最终模型训练")

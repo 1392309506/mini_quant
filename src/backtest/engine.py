@@ -130,8 +130,6 @@ def _compute_portfolio_metrics(pf, n_trading_days: int = 0) -> Dict:
         portfolio_value = portfolio_value.sum(axis=1)
 
     total_return = float((portfolio_value.iloc[-1] / portfolio_value.iloc[0]) - 1)
-    if isinstance(portfolio_value, pd.DataFrame):
-        portfolio_value = portfolio_value.iloc[:, 0]
     all_returns = portfolio_value.pct_change().dropna()
 
     if len(all_returns) == 0:
@@ -140,7 +138,7 @@ def _compute_portfolio_metrics(pf, n_trading_days: int = 0) -> Dict:
     # --- 核心指标 ---
     n_days = n_trading_days if n_trading_days > 0 else len(all_returns)
     ann_factor = 252 / n_days if n_days > 0 else 0
-    annualized_return = total_return * ann_factor if ann_factor > 0 else 0
+    annualized_return = (1 + total_return) ** ann_factor - 1 if ann_factor > 0 else 0
 
     # 年化波动率：只用有交易活动的期间（排除 0 收益的平坦段）
     active_returns = all_returns[all_returns.abs() > 1e-10]

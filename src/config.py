@@ -22,6 +22,8 @@ PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 DATA_DIR = PROJECT_ROOT / "data"
 CACHE_FILE = DATA_DIR / "market_data.parquet"
 EXPERIMENTS_DIR = PROJECT_ROOT / "experiments"
+MODELS_DIR = PROJECT_ROOT / "models"
+SIGNALS_DIR = DATA_DIR / "signals"
 
 # ---------------------------------------------------------------------------
 # 加载 .env（环境变量优先级高于 .env 文件中的值）

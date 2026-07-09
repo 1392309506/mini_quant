@@ -101,7 +101,14 @@ def generate_exit_signals(
     max_hold: int = 30,
 ) -> pd.DataFrame:
     """
-    基于持仓期限生成出场信号。
+    基于最大持仓期限生成出场信号。
+
+    每个入场的强制出场点 = max_hold 天之后。
+    min_hold 为最小持有天数，由执行层保证不提前出场。
+
+    修复说明 v0.5.0:
+      旧逻辑在 min_hold 和 max_hold 同时设 exit=True，
+      导致 max_hold 强制出场永远未生效。
     """
     exits = pd.DataFrame(False, index=entries.index, columns=entries.columns)
 
@@ -109,17 +116,15 @@ def generate_exit_signals(
         entry_dates = entries.index[entries[ticker]]
         for entry_date in entry_dates:
             entry_idx = entries.index.get_loc(entry_date)
-
-            exit_early_idx = entry_idx + min_hold
-            if exit_early_idx < len(entries.index):
-                exits.iloc[exit_early_idx, exits.columns.get_loc(ticker)] = True
-
-            exit_late_idx = entry_idx + max_hold
-            if exit_late_idx < len(entries.index):
-                exits.iloc[exit_late_idx, exits.columns.get_loc(ticker)] = True
+            exit_idx = entry_idx + max_hold
+            if exit_idx < len(entries.index):
+                exits.iloc[exit_idx, exits.columns.get_loc(ticker)] = True
 
     n_exits = exits.sum().sum()
-    logger.info(f"📉 出场信号生成: {n_exits} 笔出场")
+    logger.info(
+        f"📉 出场信号生成: {n_exits} 笔出场 "
+        f"(min_hold={min_hold}, max_hold={max_hold})"
+    )
     return exits
 
 
@@ -132,12 +137,10 @@ def filter_by_market_regime(
     市场状态过滤器：SPY 在 200 日均线之上时才允许做多。
     """
     ma = spy_close.rolling(window=ma_window, min_periods=ma_window).mean()
-    regime_ok = spy_close > ma
+    regime_ok = (spy_close > ma).reindex(entries.index, method="ffill").fillna(False)
 
     filtered = entries.copy()
-    for date in entries.index:
-        if date in regime_ok.index and not regime_ok[date]:
-            filtered.loc[date] = False
+    filtered.loc[~regime_ok] = False
 
     n_blocked = entries.sum().sum() - filtered.sum().sum()
     if n_blocked > 0:
