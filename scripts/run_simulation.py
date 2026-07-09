@@ -196,7 +196,8 @@ def create_risk_config(max_leverage: float) -> RiskConfig:
 
 # ── 每日摘要 ────────────────────────────────────────────────
 
-def print_summary(broker, risk_mgr, order_mgr, meta: dict, signals: dict):
+def print_summary(broker, risk_mgr, order_mgr, meta: dict, signals: dict,
+                  initial_balance: float = 10_000):
     """打印每日状态摘要。"""
     account = broker.get_account()
     positions = broker.get_positions()
@@ -209,9 +210,9 @@ def print_summary(broker, risk_mgr, order_mgr, meta: dict, signals: dict):
     logger.info("=" * 60)
 
     # 账户概览
-    nlv = (account["equity"] / 10_000 - 1) * 100
+    nlv = (account["equity"] / initial_balance - 1) * 100
     logger.info(f"权益: {account['equity']:>10,.2f}  余额: {account['balance']:>10,.2f}")
-    logger.info(f"净值的1值: {nlv:+.2f}%  |  持仓: {len(positions)} 笔")
+    logger.info(f"净值变化: {nlv:+.2f}%  |  持仓: {len(positions)} 笔")
 
     # 持仓明细
     if len(positions) > 0:
@@ -399,7 +400,8 @@ def main():
         broker.update_sim_prices(prices)
 
     # 10. 打印每日摘要
-    print_summary(broker, risk_mgr, order_mgr, meta, signals)
+    print_summary(broker, risk_mgr, order_mgr, meta, signals,
+                  initial_balance=args.initial_balance)
 
     # 11. 保存状态
     save_state(broker, meta)
