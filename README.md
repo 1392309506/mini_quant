@@ -41,7 +41,7 @@ python data_fetcher.py --max 3
 python factor_engine.py
 ```
 
-详细使用说明（预期输出、参数说明、FAQ、Jupyter 用法）见 [docs/使用指南.md](docs/使用指南.md)。
+详细使用说明（完整命令速查、预期输出、参数说明、FAQ）见 [docs/使用指南.md](docs/使用指南.md)。
 
 ### 因子探索
 
@@ -113,6 +113,7 @@ Quant/
 ├── notes/                   # 调研笔记与学习文档
 ├── scripts/                 # 操作脚本
 │   ├── daily_inference.py   #   每日信号生成 pipeline
+│   ├── run_simulation.py   #   模拟盘启动脚本
 │   └── test_execution.py   #   执行层测试
 ├── data_fetcher.py          # 数据获取入口
 ├── factor_engine.py         # 因子计算入口
@@ -147,7 +148,7 @@ Quant/
                             │       ├─ mean_reversion.py       │
                             │       └─ volatility.py           │
                             └──────────┬───────────────────────┘
-                                       │ factor_panel (ticker×8因子)
+                                       │ factor_panel (ticker×13因子)
                                        ▼
                             ┌──────────────────────────────────┐
                             │   标签 & 预处理 (Stage 3)       │
