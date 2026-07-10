@@ -141,8 +141,12 @@ def _compute_portfolio_metrics(pf, n_trading_days: int = 0) -> Dict:
     annualized_return = (1 + total_return) ** ann_factor - 1 if ann_factor > 0 else 0
 
     # 年化波动率：只用有交易活动的期间（排除 0 收益的平坦段）
+    dropped = len(all_returns) - (all_returns.abs() > 1e-10).sum()
+    if dropped > 0:
+        logger.debug(f"active_returns: 过滤 {dropped}/{len(all_returns)} 个平坦期")
     active_returns = all_returns[all_returns.abs() > 1e-10]
     if len(active_returns) < 20:
+        logger.warning(f"active_returns 仅 {len(active_returns)} 个有效值，使用全部 {len(all_returns)} 个")
         active_returns = all_returns  # fallback
     annualized_vol = float(active_returns.std() * (252 ** 0.5))
     sharpe = (annualized_return / annualized_vol) if annualized_vol > 1e-10 else 0

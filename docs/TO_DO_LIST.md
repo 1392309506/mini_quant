@@ -77,12 +77,12 @@
 
 | 优先级 | 任务 | 说明 | 预估工时 |
 |:---:|:---|---:|:---:|
-| P0 | VIF 多重共线性测试 | 波动率大类因子高相关风险 | 2h |
-| P1 | 安全杠杆 7x 重新评估实验 | 用 scale=7 跑 V1/V2 收益预期 | 1h |
-| P2 | 统一 N_BASE_FEATURES 推导 | 从 FEATURE_COLS/FACTOR_NAMES 自动计算 | 0.5h |
-| P3 | 建立 pytest 测试套件 | 13 个因子纯函数 + signals 生成 | 4h |
-| P4 | 删除 risk.py 未调用的 check_daily_limits | 死代码清理 | 0.5h |
-| P5 | 修复 backtest/engine.py active_returns 沉默过滤 | 加日志说明过滤量 | 0.5h |
+| P0 | VIF 多重共线性测试 | ✅ 已完成：8 个因子 VIF>5（波动率类高度共线），脚本 `scripts/vif_test.py` | 2h |
+| P1 | 安全杠杆 7x 重新评估实验 | ✅ 已完成：数据见审查报告 §十 | 1h |
+| P2 | 统一 N_BASE_FEATURES 推导 | ✅ 已完成：从 `FACTOR_NAMES` 自动推导 | 0.5h |
+| P3 | 建立 pytest 测试套件 | ✅ 已完成：`tests/test_factors.py`，20/20 通过 | 4h |
+| P4 | 删除 risk.py 未调用的 check_daily_limits | ✅ 已完成：死代码清理 | 0.5h |
+| P5 | 修复 backtest/engine.py active_returns 沉默过滤 | ✅ 已完成：加日志说明过滤量 | 0.5h |
 
 ### 中期（1-2 月）
 

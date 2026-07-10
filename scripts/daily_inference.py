@@ -154,7 +154,8 @@ def main():
     data.index.names = ["Date", "ticker"]
 
     # 添加横截面特征（rank + zscore），使特征数与训练时一致
-    N_BASE_FEATURES = 13
+    from src.factors.assembly import FACTOR_NAMES
+    N_BASE_FEATURES = len(FACTOR_NAMES)
     data = add_cross_sectional_features(data, FEATURE_COLS[:N_BASE_FEATURES])
     data = clip_outliers(data, FEATURE_COLS[:N_BASE_FEATURES], CLIP_STD_THRESHOLD)
 

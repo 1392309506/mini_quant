@@ -243,7 +243,8 @@ def main():
     data = prepare_training_data(factor_panel, closes)
     logger.info(f"   训练数据: {data.shape}")
 
-    N_BASE_FEATURES = 13
+    from src.factors.assembly import FACTOR_NAMES
+N_BASE_FEATURES = len(FACTOR_NAMES)
 
     # 3b. 添加横截面特征
     logger.info("📊 添加横截面特征...")

@@ -11,7 +11,8 @@ RiskManager — 风控检查与硬止损执行
 风控检查流程：
   1. check_order(order) → bool         下单前检查是否通过风控
   2. enforce_stop_loss(positions) → list 遍历持仓，返回需强平的 ticket
-  3. check_daily_limits() → bool       检查当日交易次数/亏损是否超限
+  3. record_trade(pnl) → None          记录当日交易次数（日内限制）
+  4. get_daily_stats() → dict          获取当日交易统计
 """
 
 import logging
@@ -218,23 +219,3 @@ class RiskManager:
             "max_daily_loss_pct": self.config.max_daily_loss_pct,
         }
 
-    def check_daily_limits(self, account: Dict) -> tuple:
-        """检查当日是否触发整体停止交易条件。"""
-        today = date.today()
-        equity = account.get("equity", account.get("balance", 0))
-
-        # 交易次数
-        if self._daily_trades.get(today, 0) >= self.config.max_daily_trades:
-            return True, f"当日交易次数达上限 {self.config.max_daily_trades}"
-
-        # 当日亏损
-        daily_pnl = self._daily_pnl.get(today, 0)
-        if equity > 0 and daily_pnl < 0:
-            loss_pct = -daily_pnl / equity
-            if loss_pct >= self.config.max_daily_loss_pct:
-                return True, (
-                    f"当日亏损 {loss_pct:.1%} 达上限 "
-                    f"{self.config.max_daily_loss_pct:.0%}"
-                )
-
-        return False, "OK"

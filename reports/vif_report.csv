@@ -1,0 +1,14 @@
+factor,VIF_mean,VIF_std,risk
+HIGH_LOW_RATIO,inf,,🔴 high
+ATR_20_NORM,33.44,11.91,🔴 high
+VOLATILITY_20,29.15,10.18,🔴 high
+ULCER_INDEX,13.59,6.05,🔴 high
+MOMO_20,13.2,2.98,🔴 high
+RSI_14,8.87,3.82,🔴 high
+BB_POS,7.35,2.6,🔴 high
+BB_WIDTH,5.03,4.36,🔴 high
+MOM_RATIO,3.47,1.09,🟡 moderate
+MAX_DD_60,3.11,2.16,🟡 moderate
+MOMO_60,3.0,1.23,🟡 moderate
+VOL_MA_RATIO,1.29,0.19,🟢 low
+CHAIKIN_MF,,,🟢 low
